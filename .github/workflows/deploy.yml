@@ -35,7 +35,8 @@ jobs:
          S3_BUCKET: my-static-web-rasikapur
 
         run:
-          aws s3 sync */ s3://my-static-web-rasikapur --delete
+          aws s3 sync . s3://my-static-web-rasikapur --delete
+
 
 
 
