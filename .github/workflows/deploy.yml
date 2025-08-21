@@ -32,10 +32,10 @@ jobs:
 
       - name: Deploy to S3
         env:
-         S3_BUCKET: my-static-website-bucket-135
+         S3_BUCKET: my-static-web-rasikapur
 
         run:
-          aws s3 sync build/ s3://my-static-website-bucket-135 --delete
+          aws s3 sync build/ s3://my-static-web-rasikapur --delete
 
 
 
