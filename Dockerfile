@@ -1,9 +1,20 @@
-FROM node
+FROM node:18
+
+# Set working directory
 WORKDIR /app
 
-COPY . .
-EXPOSE 3000
-
+# Copy package.json and package-lock.json first
 COPY package*.json ./
 
-ENTRYPOINT start npm
+# Install dependencies
+RUN npm install
+
+# Copy the rest of the code
+COPY . .
+
+# Expose app port
+EXPOSE 3000
+
+# Start the application
+CMD ["npm", "start"]
+
