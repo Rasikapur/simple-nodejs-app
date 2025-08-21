@@ -1,0 +1,49 @@
+name: deploy rasikapur
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-test-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build
+        run: npm run build
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
+
+
+      - name: Deploy to S3
+        env:
+         S3_BUCKET: my-static-website-bucket-135
+
+        run:
+          aws s3 sync build/ s3://my-static-website-bucket-135 --delete
+
+
+
+      # - name: Optional CloudFront invalidation
+      #   if: ${{ env.CLOUDFRONT_DISTRIBUTION_ID != 'EBPCD8XMCD7PY' }}
+      #   env:
+      #     CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+      #   run: |
+      #    aws cloudfront create-invalidation \
+      #      --distribution-id EBPCD8XMCD7PY \
+      #      --paths "/*"
