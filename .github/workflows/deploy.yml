@@ -1,50 +1,66 @@
-name: deploy rasikapur
+name: Deploy Node.js App with Docker on EC2 via ECR
 
 on:
   workflow_dispatch:
 
 jobs:
-  build-test-deploy:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. Checkout repo
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Build
-        run: npm run build
-      
+      # 2. Configure AWS credentials
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-south-1
+          aws-region: ${{ secrets.AWS_REGION }}
 
+      # 3. Log in to Amazon ECR
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Deploy to S3
+      # 4. Build, tag, and push Docker image
+      - name: Build, Tag, and Push image to ECR
         env:
-         S3_BUCKET: my-static-web-rasikapur
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+          IMAGE_TAG: latest
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
-        run:
-          aws s3 sync . s3://my-static-web-rasikapur --delete
+      # 5. Deploy on EC2
+      - name: SSH into EC2 and Deploy
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+          IMAGE_TAG: latest
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+        run: |
+          echo "$EC2_SSH_KEY" > key.pem
+          chmod 600 key.pem
 
+          ssh -i key.pem -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << EOF
+            # Authenticate EC2 with ECR
+            aws ecr get-login-password --region $AWS_REGION \
+              | docker login --username AWS --password-stdin $ECR_REGISTRY
 
+            # Pull latest image
+            docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
+            # Stop and remove old container if running
+            docker rm -f my-node-app || true
 
-      # - name: Optional CloudFront invalidation
-      #   if: ${{ env.CLOUDFRONT_DISTRIBUTION_ID != 'EBPCD8XMCD7PY' }}
-      #   env:
-      #     CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
-      #   run: |
-      #    aws cloudfront create-invalidation \
-      #      --distribution-id EBPCD8XMCD7PY \
-      #      --paths "/*"
+            # Run new container
+            docker run -d --name my-node-app -p 80:3000 \
+              $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          EOF
