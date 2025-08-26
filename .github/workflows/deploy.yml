@@ -45,22 +45,19 @@ jobs:
           EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
           EC2_USER: ${{ secrets.EC2_USER }}
           EC2_HOST: ${{ secrets.EC2_HOST }}
+
+      - name: Deploy on EC2
         run: |
-          echo "$EC2_SSH_KEY" > rasi.key.pem
-          chmod 400 rasi.key.pem
+         echo "$EC2_SSH_KEY" | sed 's/\\n/\n/g' > rasi.key.pem
+         chmod 400 rasi.key.pem
 
-          ssh -i rasi.key.pem -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << EOF
-            # Authenticate EC2 with ECR
-            aws ecr get-login-password --region $AWS_REGION \
-              | docker login --username AWS --password-stdin $ECR_REGISTRY
+         ssh -i rasi.key.pem -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << EOF
+           aws ecr get-login-password --region $AWS_REGION \
+             | docker login --username AWS --password-stdin $ECR_REGISTRY
 
-            # Pull latest image
-            docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+           docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+           docker rm -f my-node-app || true
+           docker run -d --name my-node-app -p 80:3000 \
+             $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+         EOF
 
-            # Stop and remove old container if running
-            docker rm -f my-node-app || true
-
-            # Run new container
-            docker run -d --name my-node-app -p 80:3000 \
-              $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          EOF
