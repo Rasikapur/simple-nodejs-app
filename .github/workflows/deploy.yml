@@ -48,7 +48,6 @@ jobs:
               | docker login --username AWS --password-stdin $ECR_REGISTRY
 
             docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-            docker rm -f my-node-app || true
             docker run -d --name my-node-app -p 80:3000 \
               $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           EOF
