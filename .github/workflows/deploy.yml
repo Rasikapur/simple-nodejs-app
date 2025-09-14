@@ -29,7 +29,7 @@ jobs:
       - name: Build, Tag, and Push image to ECR
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: simple-nodejs
+          ECR_REPOSITORY: backend-rds
           IMAGE_TAG: latest
         run: |
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
@@ -39,11 +39,11 @@ jobs:
       - name: Deploy to EC2
         run: |
           # Save SSH key properly (convert escaped newlines into real newlines)
-          echo "$EC2_SSH_KEY" | tr -d '\r' | sed 's/\\n/\n/g' > rasi.key.pem
-          chmod 600 rasi.key.pem
+          echo "$EC2_SSH_KEY" | tr -d '\r' | sed 's/\\n/\n/g' > rasi.pem
+          chmod 600 rasi.pem
 
           # Connect to EC2 and deploy
-          ssh -i rasi.key.pem -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << 'EOF'
+          ssh -i rasi.pem -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << 'EOF'
             aws ecr get-login-password --region $AWS_REGION \
               | docker login --username AWS --password-stdin $ECR_REGISTRY
 
@@ -54,13 +54,13 @@ jobs:
           EOF
         shell: bash
         env:
-          AWS_DEFAULT_REGION: ap-south-1
-          AWS_REGION: ap-south-1
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          ECR_REGISTRY: 889971544446.dkr.ecr.ap-south-1.amazonaws.com
+          ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
           ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
           IMAGE_TAG: latest
           EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
-          EC2_USER: ec2-user   # change to ubuntu if using Ubuntu AMI
+          EC2_USER: ${{ secrets.EC2_USER }}   # change to ubuntu if using Ubuntu AMI
           EC2_HOST: ${{ secrets.EC2_HOST }}
